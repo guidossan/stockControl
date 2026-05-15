@@ -87,7 +87,7 @@ export function RegisterForm() {
       name: "",
       email: "",
       password: "",
-      workspaceId: "demo-workspace",
+      workspaceId: "",
       role: "OWNER",
     },
   });

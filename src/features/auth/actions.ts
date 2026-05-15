@@ -14,7 +14,16 @@ import { connectToDatabase } from "@/src/lib/db/mongoose";
 import type { ActionResult } from "@/src/types/common";
 
 function hashPassword(password: string) {
-  return crypto.scryptSync(password, "stockflow", 64).toString("hex");
+  const salt = crypto.randomBytes(16).toString("hex");
+  const hash = crypto.scryptSync(password, salt, 64).toString("hex");
+  return `${salt}:${hash}`;
+}
+
+function verifyPassword(password: string, storedHash: string) {
+  const [salt, hash] = storedHash.split(":");
+  if (!salt || !hash) return false;
+  const derivedHash = crypto.scryptSync(password, salt, 64).toString("hex");
+  return crypto.timingSafeEqual(Buffer.from(hash), Buffer.from(derivedHash));
 }
 
 export async function registerAction(
@@ -58,7 +67,7 @@ export async function loginAction(input: LoginInput): Promise<ActionResult> {
   const user = await UserModel.findOne({ email: parsed.data.email });
   if (!user) return { success: false, message: "Invalid credentials" };
 
-  if (user.passwordHash !== hashPassword(parsed.data.password)) {
+  if (!verifyPassword(parsed.data.password, user.passwordHash)) {
     return { success: false, message: "Invalid credentials" };
   }
 

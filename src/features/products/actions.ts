@@ -12,8 +12,17 @@ import {
   productSchema,
 } from "@/src/features/products/schemas";
 import { canManageCatalog, requireSession } from "@/src/lib/auth/guards";
+import { isMongoDuplicateKeyError } from "@/src/lib/db/errors";
 import { connectToDatabase } from "@/src/lib/db/mongoose";
 import type { ActionResult } from "@/src/types/common";
+
+function duplicateSkuResult(error: unknown): ActionResult | null {
+  if (!isMongoDuplicateKeyError(error)) return null;
+  return {
+    success: false,
+    message: "SKU already exists in this workspace",
+  };
+}
 
 export async function listProducts(search?: string) {
   const session = await requireSession();
@@ -101,12 +110,24 @@ export async function upsertProduct(
   };
 
   if (parsed.data.id) {
-    await ProductModel.findOneAndUpdate(
-      { _id: parsed.data.id, workspaceId: session.workspaceId },
-      payload,
-    );
+    try {
+      await ProductModel.findOneAndUpdate(
+        { _id: parsed.data.id, workspaceId: session.workspaceId },
+        payload,
+      );
+    } catch (error) {
+      const duplicateError = duplicateSkuResult(error);
+      if (duplicateError) return duplicateError;
+      throw error;
+    }
   } else {
-    await ProductModel.create(payload);
+    try {
+      await ProductModel.create(payload);
+    } catch (error) {
+      const duplicateError = duplicateSkuResult(error);
+      if (duplicateError) return duplicateError;
+      throw error;
+    }
   }
 
   revalidatePath("/products");

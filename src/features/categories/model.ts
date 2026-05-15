@@ -8,6 +8,7 @@ const categorySchema = new Schema(
   },
   { timestamps: true },
 );
+categorySchema.index({ workspaceId: 1, name: 1 }, { unique: true });
 
 export type CategoryDocument = InferSchemaType<typeof categorySchema>;
 export const CategoryModel =

@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { env } from "@/src/lib/env";
 
 const SESSION_COOKIE = "stockflow_session";
+const SESSION_MAX_AGE = 60 * 60 * 24 * 7;
 
 export type UserRole = "OWNER" | "ADMIN" | "EMPLOYEE";
 
@@ -31,7 +32,7 @@ export async function setSession(payload: SessionPayload) {
     sameSite: "lax",
     secure: env.NODE_ENV === "production",
     path: "/",
-    maxAge: 60 * 60 * 24 * 7,
+    maxAge: SESSION_MAX_AGE,
   });
 }
 

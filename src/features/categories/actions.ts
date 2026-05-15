@@ -7,6 +7,7 @@ import {
   categorySchema,
 } from "@/src/features/categories/schemas";
 import { requireSession } from "@/src/lib/auth/guards";
+import { isMongoDuplicateKeyError } from "@/src/lib/db/errors";
 import { connectToDatabase } from "@/src/lib/db/mongoose";
 import type { ActionResult } from "@/src/types/common";
 
@@ -30,17 +31,30 @@ export async function upsertCategory(
     };
 
   await connectToDatabase();
-  if (parsed.data.id) {
-    await CategoryModel.findOneAndUpdate(
-      { _id: parsed.data.id, workspaceId: session.workspaceId },
-      { name: parsed.data.name, description: parsed.data.description ?? "" },
-    );
-  } else {
-    await CategoryModel.create({
-      workspaceId: session.workspaceId,
-      name: parsed.data.name,
-      description: parsed.data.description ?? "",
-    });
+  try {
+    if (parsed.data.id) {
+      const updatedCategory = await CategoryModel.findOneAndUpdate(
+        { _id: parsed.data.id, workspaceId: session.workspaceId },
+        { name: parsed.data.name, description: parsed.data.description ?? "" },
+      );
+      if (!updatedCategory) {
+        return { success: false, message: "Category not found" };
+      }
+    } else {
+      await CategoryModel.create({
+        workspaceId: session.workspaceId,
+        name: parsed.data.name,
+        description: parsed.data.description ?? "",
+      });
+    }
+  } catch (error) {
+    if (isMongoDuplicateKeyError(error)) {
+      return {
+        success: false,
+        message: "Category name already exists in this workspace",
+      };
+    }
+    throw error;
   }
 
   revalidatePath("/categories");
